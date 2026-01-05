@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                 Int           @id @default(autoincrement())
+  name               String        @unique(map: "sqlite_autoindex_accounts_1")
+  accountType        String        @map("account_type")
+  institution        String?
+  accountNumberLast4 String?       @map("account_number_last4")
+  currentBalance     Float?        @map("current_balance")
+  clearedBalance     Float?        @map("cleared_balance")
+  isOnBudget         Boolean?      @map("is_on_budget")
+  isClosed           Boolean?      @map("is_closed")
+  notes              String?
+  createdAt          DateTime?     @map("created_at")
+  updatedAt          DateTime?     @updatedAt @map("updated_at")
+  transfersTo        Transaction[] @relation("TransferAccount")
+  transactions       Transaction[] @relation("AccountTransactions")
+
+  @@map("accounts")
+}
+
+model CategoryGroup {
+  id         Int        @id @default(autoincrement())
+  name       String     @unique(map: "sqlite_autoindex_category_groups_1")
+  sortOrder  Int?       @map("sort_order")
+  isHidden   Boolean?   @map("is_hidden")
+  createdAt  DateTime?  @map("created_at")
+  categories Category[]
+
+  @@map("category_groups")
+}
+
+model Category {
+  id            Int           @id @default(autoincrement())
+  groupId       Int           @map("group_id")
+  name          String
+  sortOrder     Int?          @map("sort_order")
+  isHidden      Boolean?      @map("is_hidden")
+  notes         String?
+  createdAt     DateTime?     @map("created_at")
+  budgetEntries BudgetEntry[]
+  group         CategoryGroup @relation(fields: [groupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  goal          Goal?
+  payeeDefaults Payee[]
+  transactions  Transaction[]
+
+  @@unique([groupId, name], map: "sqlite_autoindex_categories_1")
+  @@map("categories")
+}
+
+model Payee {
+  id                Int              @id @default(autoincrement())
+  name              String           @unique(map: "sqlite_autoindex_payees_1")
+  defaultCategoryId Int?             @map("default_category_id")
+  autoCategorize    Boolean?         @map("auto_categorize")
+  createdAt         DateTime?        @map("created_at")
+  matchRules        PayeeMatchRule[]
+  defaultCategory   Category?        @relation(fields: [defaultCategoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transactions      Transaction[]
+
+  @@map("payees")
+}
+
+model PayeeMatchRule {
+  id        Int     @id @default(autoincrement())
+  payeeId   Int     @map("payee_id")
+  pattern   String
+  matchType String? @map("match_type")
+  priority  Int?
+  payee     Payee   @relation(fields: [payeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([priority], map: "ix_payee_match_rules_priority")
+  @@map("payee_match_rules")
+}
+
+model Transaction {
+  id                Int       @id @default(autoincrement())
+  accountId         Int       @map("account_id")
+  categoryId        Int?      @map("category_id")
+  payeeId           Int?      @map("payee_id")
+  transferAccountId Int?      @map("transfer_account_id")
+  date              DateTime
+  amount            Float
+  transactionType   String    @map("transaction_type")
+  memo              String?
+  isCleared         Boolean?  @map("is_cleared")
+  isReconciled      Boolean?  @map("is_reconciled")
+  importId          String?   @unique(map: "ix_transactions_import_id") @map("import_id")
+  importSource      String?   @map("import_source")
+  rawPayeeName      String?   @map("raw_payee_name")
+  createdAt         DateTime? @map("created_at")
+  updatedAt         DateTime? @updatedAt @map("updated_at")
+  transferAccount   Account?  @relation("TransferAccount", fields: [transferAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payee             Payee?    @relation(fields: [payeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  category          Category? @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account           Account   @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([date, accountId], map: "ix_transactions_date_account")
+  @@index([categoryId], map: "ix_transactions_category")
+  @@index([date], map: "ix_transactions_date")
+  @@map("transactions")
+}
+
+model BudgetEntry {
+  id         Int       @id @default(autoincrement())
+  categoryId Int       @map("category_id")
+  month      DateTime
+  budgeted   Float?
+  createdAt  DateTime? @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+  category   Category  @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([categoryId, month], map: "sqlite_autoindex_budget_entries_1")
+  @@index([month], map: "ix_budget_entries_month")
+  @@map("budget_entries")
+}
+
+model Goal {
+  id             Int       @id @default(autoincrement())
+  categoryId     Int       @unique(map: "sqlite_autoindex_goals_1") @map("category_id")
+  goalType       String    @map("goal_type")
+  targetAmount   Float?    @map("target_amount")
+  targetDate     DateTime? @map("target_date")
+  monthlyFunding Float?    @map("monthly_funding")
+  createdAt      DateTime? @map("created_at")
+  updatedAt      DateTime? @updatedAt @map("updated_at")
+  category       Category  @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("goals")
+}
+
+model ImportProfile {
+  id                  Int       @id @default(autoincrement())
+  name                String    @unique(map: "sqlite_autoindex_import_profiles_1")
+  institution         String?
+  dateColumn          String?   @map("date_column")
+  dateFormat          String?   @map("date_format")
+  amountColumn        String?   @map("amount_column")
+  amountInflowColumn  String?   @map("amount_inflow_column")
+  amountOutflowColumn String?   @map("amount_outflow_column")
+  payeeColumn         String?   @map("payee_column")
+  memoColumn          String?   @map("memo_column")
+  skipHeaderRows      Int?      @map("skip_header_rows")
+  amountMultiplier    Float?    @map("amount_multiplier")
+  createdAt           DateTime? @map("created_at")
+
+  @@map("import_profiles")
+}
