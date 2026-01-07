@@ -1,5 +1,7 @@
 # Zeroed - Zero-Based Budget App
 
+[![Powered by Claude Code](https://raw.githubusercontent.com/dontoisme/awesome-powered-by-claude-code/main/badges/powered-by-claude-code-dark.svg)](https://github.com/dontoisme/awesome-powered-by-claude-code)
+
 A YNAB-style personal finance application with a Python CLI for data management and a Next.js web dashboard for visualization. Uses local SQLite storage for privacy.
 
 ## Architecture
